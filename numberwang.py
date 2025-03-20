@@ -3,7 +3,7 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from torchvision import datasets, transforms
+from torchvision import transforms
 from torch.utils.data import TensorDataset, DataLoader
 import torch.optim as optim
 from timeit import default_timer as timer
@@ -13,6 +13,7 @@ from timeit import default_timer as timer
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 print(f"Using {device} device")
+
 train_data_raw = pd.read_csv("./mnist_train/mnist_train.csv")
 normalize_transform = transforms.Compose([
     transforms.Normalize((0.5,), (0.5,))
@@ -31,24 +32,19 @@ def show_image(image):
     plt.axis('off')
     plt.show()
 
-
 first_image = train_tensor[2][0].detach()
 show_image(first_image)
 in_channels = 64
-feature_maps = 4
+feature_maps = 14
 out_channels = 1
-kernel_size = 4
+kernel_size = 6
 stride_def = 2
-
 
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.net = nn.Sequential(
-            nn.ConvTranspose2d(in_channels, feature_maps * 4, kernel_size),
-            nn.BatchNorm2d(feature_maps * 4),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(feature_maps * 4, feature_maps * 2, kernel_size, stride=stride_def, padding=1),
+            nn.ConvTranspose2d(in_channels, feature_maps * 2, kernel_size),
             nn.BatchNorm2d(feature_maps * 2),
             nn.ReLU(True),
             nn.ConvTranspose2d(feature_maps * 2, out_channels, kernel_size, stride=stride_def, padding=1),
@@ -57,7 +53,6 @@ class Generator(nn.Module):
 
     def forward(self, x):
         return self.net(x)
-
 
 generator = Generator()
 
@@ -80,7 +75,6 @@ output_tensor = generator(input_tensor)
 print(output_tensor.shape)
 output_image = output_tensor[4][0].detach().numpy()
 
-
 # show_image(output_image)
 class Discriminator(nn.Module):
     def __init__(self):
@@ -88,23 +82,18 @@ class Discriminator(nn.Module):
         self.net = nn.Sequential(
             nn.Conv2d(out_channels, feature_maps, kernel_size),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(feature_maps, feature_maps * 2, kernel_size, stride=stride_def),
+            nn.Conv2d(feature_maps, feature_maps, kernel_size, stride=stride_def),
             nn.BatchNorm2d(feature_maps * 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(feature_maps * 2, feature_maps, kernel_size, stride=stride_def),
-            nn.BatchNorm2d(feature_maps),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(feature_maps, 1, kernel_size),
+            nn.Conv2d(feature_maps, feature_maps, kernel_size, stride=stride_def),
             nn.Sigmoid()
         )
 
     def forward(self, x):
         return self.net(x)
 
-
 discriminator = Discriminator()
 x = discriminator(output_tensor)
-x.shape
 lr = 0.0002
 beta1 = 0.5
 
@@ -150,10 +139,12 @@ for epoch in range(num_epochs):
 
         g_loss.backward()
         optimizer_G.step()
+
 output_tensor2 = generator(input_tensor)
 output_image2 = output_tensor2[3][0].detach().numpy()
 show_image(output_image2)
 print(output_image2.shape)
+
 input_tensor2 = torch.rand(image_batch, in_channels, gen_dim, gen_dim)
 output_tensor3 = generator(input_tensor2)
 output_image3 = output_tensor3[3][0].detach().numpy()
